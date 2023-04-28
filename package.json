@@ -1,0 +1,16 @@
+{
+  "name": "https-upgrade-exceptions-lambda",
+  "version": "0.0.1",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Arthur Edelstein <aedelstein@brave.com>",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer-core": "^19.11.1",
+    "@sparticuz/chromium": "^112.0.2"
+  }
+}

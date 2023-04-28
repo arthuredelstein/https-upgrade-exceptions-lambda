@@ -1,0 +1,62 @@
+import puppeteer from 'puppeteer-core';
+import crypto from 'crypto';
+import chromium from '@sparticuz/chromium';
+
+const chromeExecutable = '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome'
+
+const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
+
+const getScreenshotHash = async (page) => {
+  const image = await page.screenshot({ type: "png" });
+  const hash = crypto.createHash('sha256').update(image).digest('hex');
+  return hash.substring(0, 16);
+};
+
+export const createBrowser = async (headless, macOS) => {
+  puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: macOS ? chromeExecutable : await chromium.executablePath(),
+    headless: (headless !== false),
+  });
+}
+
+const callsToJson = (object, callNames) => {
+  const result = {};
+  for (const callName of callNames) {
+    result[callName] = object[callName]();
+  }
+  return result;
+};
+
+const responseToJson = (responseObject) =>
+  callsToJson(responseObject, ['status', 'statusText', 'url']);
+
+export const pageTest = async (browser, url) => {
+  const responses = [];
+  const page = await browser.newPage();
+  page.setDefaultNavigationTimeout(20000);
+  page.on('response', interceptedResponse => {
+    responses.push(responseToJson(interceptedResponse));
+  });
+  let err = null;
+  let img_hash = null;
+  try {
+    await Promise.all(
+      [await page.goto(url, { waitUntil: 'load' }),
+      await sleep(5000)]);
+    img_hash = await getScreenshotHash(page);
+  } catch (e) {
+    err = e;
+  }
+  await page.close();
+  return { responses, final_url: page.url(), error: err, img_hash };
+};
+
+export const domainTest = async (browser, domain) => {
+  const [insecure, secure] = await Promise.all([
+    pageTest(browser, `http://${domain}`),
+    pageTest(browser, `https://${domain}`)
+  ]);
+  return { insecure, secure };
+};
