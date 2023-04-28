@@ -2,8 +2,6 @@ import puppeteer from 'puppeteer-core';
 import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
 
-const chromeExecutable = '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome'
-
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
 
 const getScreenshotHash = async (page) => {
@@ -12,12 +10,12 @@ const getScreenshotHash = async (page) => {
   return hash.substring(0, 16);
 };
 
-export const createBrowser = async (headless, macOS) => {
-  puppeteer.launch({
+export const createBrowser = async () => {
+  return puppeteer.launch({
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    executablePath: macOS ? chromeExecutable : await chromium.executablePath(),
-    headless: (headless !== false),
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 }
 
