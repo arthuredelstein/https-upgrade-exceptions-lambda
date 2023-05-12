@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer-core';
 import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
+import { SQSClient, AddPermissionCommand } from "@aws-sdk/client-sqs";
 
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
 
@@ -47,7 +48,6 @@ export const pageTest = async (browser, url) => {
   } catch (e) {
     err = e;
   }
-  await page.close();
   return { responses, final_url: page.url(), error: err, img_hash };
 };
 
@@ -57,4 +57,14 @@ export const domainTest = async (browser, domain) => {
     pageTest(browser, `https://${domain}`)
   ]);
   return { insecure, secure };
+};
+
+const client = new SQSClient({ region: "us-west-1" });
+
+export const handler = async (event, context) => {
+  console.log("EVENT", event);
+  const browser = await createBrowser();
+  const results = await domainTest(browser, event.domain);
+  await client.send(JSON.stringify(results));
+  return results;
 };
