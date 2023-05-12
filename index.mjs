@@ -65,6 +65,11 @@ export const handler = async (event, context) => {
   console.log("EVENT", event);
   const browser = await createBrowser();
   const results = await domainTest(browser, event.domain);
-  await client.send(JSON.stringify(results));
+  try {
+    await client.send(JSON.stringify(results));
+    console.log("send succeeded");
+  } catch (e) {
+    console.log(e);
+  }
   return results;
 };
