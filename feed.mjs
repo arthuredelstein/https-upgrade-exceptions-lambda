@@ -7,7 +7,7 @@ export const handler = async (event, context) => {
   const { domains } = await getTrancoData(10);
   console.log(domains);
   for (const domain of domains) {
-    const result = await sendToSQS(domainQueue, JSON.stringify({domain}));
+    const result = await sendToSQS(domainQueue, {domain});
     console.log(domain, ":", result);
   }
 };
