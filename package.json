@@ -10,8 +10,8 @@
   "author": "Arthur Edelstein <aedelstein@brave.com>",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.332.0",
     "@sparticuz/chromium": "^113.0.1",
+    "aws-sdk": "^2.1377.0",
     "puppeteer-core": "^20.2.0"
   }
 }

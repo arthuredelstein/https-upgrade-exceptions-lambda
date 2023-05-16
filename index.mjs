@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer-core';
 import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
-import { SQSClient, AddPermissionCommand } from "@aws-sdk/client-sqs";
+import { sendToSQS } from './util.mjs';
 
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
 
@@ -56,20 +56,26 @@ export const domainTest = async (browser, domain) => {
     pageTest(browser, `http://${domain}`),
     pageTest(browser, `https://${domain}`)
   ]);
-  return { insecure, secure };
+  return { domain, results: { insecure, secure }};
 };
 
-const client = new SQSClient({ region: "us-west-1" });
+const resultQueueUrl = "https://sqs.us-west-1.amazonaws.com/275005321946/result-queue";
 
 export const handler = async (event, context) => {
-  console.log("EVENT", event);
-  const browser = await createBrowser();
-  const results = await domainTest(browser, event.domain);
   try {
-    await client.send(JSON.stringify(results));
-    console.log("send succeeded");
+    console.log({"event": JSON.stringify(event, null, '  '), "context": JSON.stringify(event, null, '  ')});
+    const browser = await createBrowser();
+    const domain = event.domain ?? JSON.parse(event.Records[0].body).domain;
+    const results = await domainTest(browser, domain);
+    try {
+      const sent = await sendToSQS(resultQueueUrl, results);
+      console.log("send succeeded", JSON.stringify(sent));
+    } catch (e) {
+      console.log("send failed", e);
+    }
+    return results;
   } catch (e) {
     console.log(e);
+    return null;
   }
-  return results;
 };
