@@ -65,15 +65,17 @@ export const handler = async (event, context) => {
   try {
     console.log({"event": JSON.stringify(event, null, '  '), "context": JSON.stringify(event, null, '  ')});
     const browser = await createBrowser();
-    const domain = event.domain ?? JSON.parse(event.Records[0].body).domain;
-    const results = await domainTest(browser, domain);
-    try {
-      const sent = await sendToSQS(resultQueueUrl, results);
-      console.log("send succeeded", JSON.stringify(sent));
-    } catch (e) {
-      console.log("send failed", e);
+    const domains = event.domains ?? event.Records.map(record => JSON.parse(record.body).domain);
+    for (let domain of domains) {
+      const results = await domainTest(browser, domain);
+      try {
+        const sent = await sendToSQS(resultQueueUrl, results);
+        console.log("send succeeded", JSON.stringify(sent));
+      } catch (e) {
+        console.log("send failed", e);
+      }
     }
-    return results;
+    return null;
   } catch (e) {
     console.log(e);
     return null;
