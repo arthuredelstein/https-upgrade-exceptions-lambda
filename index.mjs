@@ -70,9 +70,9 @@ export const handler = async (event, context) => {
       const results = await domainTest(browser, domain);
       try {
         const sent = await sendToSQS(resultQueueUrl, results);
-        console.log("send succeeded", JSON.stringify(sent));
+        console.log("send succeeded", JSON.stringify(results), JSON.stringify(sent));
       } catch (e) {
-        console.log("send failed", e);
+        console.log("send failed", JSON.stringify(results), e);
       }
     }
     return null;
