@@ -25,7 +25,7 @@ const getChunkedDomains = async (total, chunkSize) => {
 }
 
 export const handler = async (event, context) => {
-  const domains = await getChunkedDomains(1000000, 10);
+  const domains = await getChunkedDomains(event.count, 10);
   const resultPromises = [];
   for (const batch of domains) {
     const resultPromise = sendBatchToSQS(domainQueue, batch.map(domain => ({ domain })));
