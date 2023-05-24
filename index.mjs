@@ -56,7 +56,8 @@ export const domainTest = async (browser, domain) => {
     pageTest(browser, `http://${domain}`),
     pageTest(browser, `https://${domain}`)
   ]);
-  return { domain, results: { insecure, secure }};
+  const img_hash_match = insecure.img_hash === secure.img_hash;
+  return { domain, insecure, secure, img_hash_match };
 };
 
 const resultQueueUrl = "https://sqs.us-west-1.amazonaws.com/275005321946/result-queue";
