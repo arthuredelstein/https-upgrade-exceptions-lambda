@@ -3,7 +3,7 @@
 const fetchText = async (url) => {
   const response = await fetch(url);
   return response.text();
-}
+};
 
 const get = async (count = 1000) => {
   // First figure out what the ID of the current Tranco list is.
@@ -18,4 +18,4 @@ const get = async (count = 1000) => {
 
 module.exports = {
   get
-}
+};
