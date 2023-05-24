@@ -14,6 +14,17 @@ export const sendToSQS = (url, messageObject) => {
   return new Promise((resolve, reject) => sqs.sendMessage(params, callback(resolve, reject)));
 };
 
+export const sendBatchToSQS = (url, messageObjectArray) => {
+  const params = {
+    Entries: messageObjectArray.map(messageObject => ({
+      Id: Math.random().toString().slice(2),
+      MessageBody: JSON.stringify(messageObject)
+    })),
+    QueueUrl: url
+  };
+  return new Promise((resolve, reject) => sqs.sendMessageBatch(params, callback(resolve, reject)));
+};
+
 const dyanmo = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-11-05'});
 
 export const writeToDynamoDB = (url, item) => {
