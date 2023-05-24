@@ -36,7 +36,10 @@ export const pageTest = async (browser, url) => {
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(20000);
   page.on('response', interceptedResponse => {
-    responses.push(responseToJson(interceptedResponse));
+    const responseJson = responseToJson(interceptedResponse);
+    if (responseJson.url.startsWith("http")) {
+      responses.push(responseToJson(interceptedResponse));
+    }
   });
   let err = null;
   let img_hash = null;
@@ -48,6 +51,7 @@ export const pageTest = async (browser, url) => {
   } catch (e) {
     err = e;
   }
+  await page.close();
   return { responses, final_url: page.url(), error: err, img_hash };
 };
 
@@ -62,13 +66,14 @@ export const domainTest = async (browser, domain) => {
 
 const resultQueueUrl = "https://sqs.us-west-1.amazonaws.com/275005321946/result-queue";
 
+const gBrowser = await createBrowser();
+
 export const handler = async (event, context) => {
   try {
     console.log({"event": JSON.stringify(event, null, '  '), "context": JSON.stringify(event, null, '  ')});
-    const browser = await createBrowser();
     const domains = event.domains ?? event.Records.map(record => JSON.parse(record.body).domain);
     for (let domain of domains) {
-      const results = await domainTest(browser, domain);
+      const results = await domainTest(gBrowser, domain);
       try {
         const sent = await sendToSQS(resultQueueUrl, results);
         console.log("send succeeded", JSON.stringify(results), JSON.stringify(sent));
