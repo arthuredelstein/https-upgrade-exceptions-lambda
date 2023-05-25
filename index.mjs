@@ -82,6 +82,7 @@ export const handler = async (event, context) => {
     const domains = event.domains ?? event.Records.map(record => JSON.parse(record.body).domain);
     for (let domain of domains) {
       const results = await domainTest(gBrowser, domain);
+      results["time"] = new Date().toISOString();
       try {
         const sent = await sendToSQS(resultQueueUrl, results);
         console.log("send succeeded", JSON.stringify(results), JSON.stringify(sent));
