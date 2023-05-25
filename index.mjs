@@ -52,7 +52,14 @@ export const pageTest = async (browser, url) => {
     errorMessage = e.message;
   }
   await page.close();
-  return { responses, final_url: page.url(), err: errorMessage, img_hash };
+  const final_url = page.url();
+  let final_status = null;
+  for (const response of responses) {
+    if (response.url === final_url) {
+      final_status = response.status;
+    }
+  }
+  return { responses, final_status, final_url, err: errorMessage, img_hash };
 };
 
 export const domainTest = async (browser, domain) => {
@@ -61,7 +68,8 @@ export const domainTest = async (browser, domain) => {
     pageTest(browser, `https://${domain}`)
   ]);
   const img_hash_match = insecure.img_hash === secure.img_hash;
-  return { domain, insecure, secure, img_hash_match };
+  const final_url_match = insecure.final_url === secure.final_url;
+  return { domain, insecure, secure, img_hash_match, final_url_match };
 };
 
 const resultQueueUrl = "https://sqs.us-west-1.amazonaws.com/275005321946/result-queue";
