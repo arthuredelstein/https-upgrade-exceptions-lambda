@@ -41,7 +41,7 @@ export const pageTest = async (browser, url) => {
       responses.push(responseToJson(interceptedResponse));
     }
   });
-  let err = null;
+  let errorMessage = null;
   let img_hash = null;
   try {
     await Promise.all(
@@ -49,10 +49,10 @@ export const pageTest = async (browser, url) => {
       await sleep(5000)]);
     img_hash = await getScreenshotHash(page);
   } catch (e) {
-    err = e;
+    errorMessage = e.message;
   }
   await page.close();
-  return { responses, final_url: page.url(), error: err, img_hash };
+  return { responses, final_url: page.url(), err: errorMessage, img_hash };
 };
 
 export const domainTest = async (browser, domain) => {
