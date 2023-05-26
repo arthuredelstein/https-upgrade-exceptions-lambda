@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer-core';
 import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
 import { sendToSQS } from './util.mjs';
+import { putJSON } from './s3.mjs';
 
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
 
@@ -76,18 +77,22 @@ const resultQueueUrl = "https://sqs.us-west-1.amazonaws.com/275005321946/result-
 
 const gBrowser = await createBrowser();
 
+const runTestAndPost = async (timeStamp, browser, domain) => {
+  const results = await domainTest(gBrowser, domain);
+  const response = await putJSON(`raw/${timeStamp}/${domain}`, results);
+  return { results, response };
+}
+
 export const handler = async (event, context) => {
   try {
     console.log({"event": JSON.stringify(event, null, '  '), "context": JSON.stringify(event, null, '  ')});
-    const domains = event.domains ?? event.Records.map(record => JSON.parse(record.body).domain);
-    for (let domain of domains) {
-      const results = await domainTest(gBrowser, domain);
-      results["time"] = new Date().toISOString();
+    const messages = event.data ?? event.Records.map(record => JSON.parse(record.body));
+    for (let { domain, timeStamp } of messages) {
       try {
-        const sent = await sendToSQS(resultQueueUrl, results);
-        console.log("send succeeded", JSON.stringify(results), JSON.stringify(sent));
+        const { results, response } = await domainTest(timeStamp, gBrowser, domain);
+        console.log("send succeeded:", JSON.stringify(results), JSON.stringify(response));
       } catch (e) {
-        console.log("send failed", JSON.stringify(results), e);
+        console.log("send failed:", domain, e);
       }
     }
     return null;
