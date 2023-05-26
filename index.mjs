@@ -75,13 +75,13 @@ export const domainTest = async (browser, domain) => {
 
 const resultQueueUrl = "https://sqs.us-west-1.amazonaws.com/275005321946/result-queue";
 
-const gBrowser = await createBrowser();
-
 const runTestAndPost = async (timeStamp, browser, domain) => {
-  const results = await domainTest(gBrowser, domain);
+  const results = await domainTest(browser, domain);
   const response = await putJSON(`raw/${timeStamp}/${domain}`, results);
   return { results, response };
 }
+
+const gBrowser = await createBrowser();
 
 export const handler = async (event, context) => {
   try {
@@ -89,7 +89,7 @@ export const handler = async (event, context) => {
     const messages = event.data ?? event.Records.map(record => JSON.parse(record.body));
     for (let { domain, timeStamp } of messages) {
       try {
-        const { results, response } = await domainTest(timeStamp, gBrowser, domain);
+        const { results, response } = await runTestAndPost(timeStamp, gBrowser, domain);
         console.log("send succeeded:", JSON.stringify(results), JSON.stringify(response));
       } catch (e) {
         console.log("send failed:", domain, e);
