@@ -10,6 +10,9 @@
   "author": "Arthur Edelstein <aedelstein@brave.com>",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.338.0",
+    "@aws-sdk/client-s3": "^3.338.0",
+    "@aws-sdk/lib-dynamodb": "^3.338.0",
     "@sparticuz/chromium": "^113.0.1",
     "aws-sdk": "^2.1377.0",
     "puppeteer-core": "^20.2.0"
