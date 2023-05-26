@@ -27,8 +27,9 @@ const getChunkedDomains = async (total, chunkSize) => {
 export const handler = async (event, context) => {
   const domains = await getChunkedDomains(event.count, 10);
   const resultPromises = [];
+  const timeStamp = new Date().toISOString().slice(0,19).replace(/[-:]/g,"");
   for (const batch of domains) {
-    const resultPromise = sendBatchToSQS(domainQueue, batch.map(domain => ({ domain })));
+    const resultPromise = sendBatchToSQS(domainQueue, batch.map(domain => ({ domain, timeStamp })));
     resultPromises.push(resultPromise);
   }
   await Promise.all(resultPromises);
