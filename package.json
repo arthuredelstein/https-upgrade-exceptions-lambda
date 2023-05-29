@@ -15,6 +15,8 @@
     "@aws-sdk/lib-dynamodb": "^3.338.0",
     "@sparticuz/chromium": "^113.0.1",
     "aws-sdk": "^2.1377.0",
-    "puppeteer-core": "^20.2.0"
+    "p-map": "^6.0.0",
+    "puppeteer-core": "^20.2.0",
+    "queue": "^7.0.0"
   }
 }
