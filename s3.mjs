@@ -80,6 +80,12 @@ export const getAllNames = async function (path) {
   return bigList;
 }
 
+const saveAllObjects = async (path) => {
+  const objects = await listAllObjects();
+  const keys = objects.map(item => item.Key);
+  await pMap(keys, fetchAndSave, { concurrency: 100});
+}
+
 const selectObjects = async function (path, filter) {
   let i = 0;
   const items = objectListIterator(path);
