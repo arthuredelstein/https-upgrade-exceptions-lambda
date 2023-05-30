@@ -12,13 +12,21 @@ const getScreenshotHash = async (page) => {
   return hash.substring(0, 16);
 };
 
-export const createBrowser = async () => {
-  return puppeteer.launch({
+const puppeteerParameters = {
+  linux: {
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
     executablePath: await chromium.executablePath(),
     headless: chromium.headless,
-  });
+  },
+  darwin: {
+    channel:"chrome",
+    headless: true
+  }
+}
+
+export const createBrowser = async () => {
+  return puppeteer.launch(puppeteerParameters[process.platform]);
 }
 
 const callsToJson = (object, callNames) => {
