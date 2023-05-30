@@ -77,27 +77,66 @@ export const getAllNames = async function (path) {
       break;
     }
   }
-  return bigList;
+  const keyList = bigList.map(item => item.Key);
+  await fsPromise.mkdir(path, { recursive: true });
+  await fsPromise.writeFile(path + "-names.txt", keyList.join("\n"));
+  return keyList;
 }
 
-const saveAllObjects = async (path) => {
-  const objects = await listAllObjects();
-  const keys = objects.map(item => item.Key);
-  await pMap(keys, fetchAndSave, { concurrency: 100});
+const fetchAndSaveAllObjects = async (keys) => {
+  await pMap(keys, fetchAndSave, { concurrency: 50});
 }
 
-const selectObjects = async function (path, filter) {
+const urlEssence = (urlString) => {
+  const url = new URL(urlString);
+  url.search = "";
+  const newURL = url.href
+    .replace(/^https:\/\//, "")
+    .replace(/^http:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/^m\./, "")
+    .replace(/\/en\/$/, "/")
+    .replace(/index\.html$/, "")
+    .replace(/index\.htm$/, "")
+    .replace(/index\.php$/, "")
+    .replace(/\/+$/, "")
+    .replace(/ww[0-9][0-9]\./, "www.")
+    .replace(/subid1=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/, "");
+  return newURL;
+};
+
+const readObject = async fileName => {
+  return JSON.parse(await fsPromise.readFile(fileName));
+}
+
+const justRedirects = value => {
+  if (value.secure.responses.length > 10 &&
+    value.insecure.responses.length > 10 &&
+    value.secure.responses.length + 1 === value.insecure.responses.length &&
+    value.insecure.responses[0].status >= 300 &&
+    value.insecure.responses[0].status < 400) {
+    return true;
+  }
+  return false;
+}
+
+const selectObjects = async (path, names, filter) => {
+  const filteredObjects = [];
   let i = 0;
-  const items = objectListIterator(path);
-  for await (const item of items) {
-    const object = await getJSON(item.Key);
+  for (const name of names) {
+    const fileName = `raw/${path}/${name}`;
+    const object = JSON.parse(await fsPromise.readFile(fileName));
+    try {
+      if (filter(object)) {
+        filteredObjects.push(name);
+      }
+    } catch (e) {
+      console.log(name, object, e);
+    } 
     ++i;
-    //if (filter(object)) {
-    //  yield object;
-    //}
-    if (i >= 1000) {
-      break;
+    if (i % 1000 === 0) {
+      console.log(i, ":", filteredObjects.length);
     }
   }
-  return i;
-};
+  return filteredObjects;
+}

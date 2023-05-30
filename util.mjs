@@ -1,6 +1,6 @@
-import AWS from 'aws-sdk';
+import { SQSClient, AddPermissionCommand } from "@aws-sdk/client-sqs";
 
-const sqs = new AWS.SQS({apiVersion: '2012-11-05'});
+const client = new SQSClient({ region: "us-west-1" });
 
 const callback = (resolve, reject) => (err, data) => err ? reject(err) : resolve(data);
 
@@ -11,7 +11,8 @@ export const sendToSQS = (url, messageObject) => {
     MessageBody: JSON.stringify(messageObject),
     QueueUrl: url
   };
-  return new Promise((resolve, reject) => sqs.sendMessage(params, callback(resolve, reject)));
+  const command = new AddPermissionCommand(params);
+  return client.send(command);
 };
 
 export const sendBatchToSQS = (url, messageObjectArray) => {
@@ -22,15 +23,6 @@ export const sendBatchToSQS = (url, messageObjectArray) => {
     })),
     QueueUrl: url
   };
-  return new Promise((resolve, reject) => sqs.sendMessageBatch(params, callback(resolve, reject)));
-};
-
-const dyanmo = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-11-05'});
-
-export const writeToDynamoDB = (url, item) => {
-  const params = {
-    TableName: 'https-results',
-    Item: item
-  };
-  return new Promise((resolve, reject) => dyanmo.put(params, callback(resolve, reject)));
+  const command = new AddPermissionCommand(params);
+  return client.send(command);
 };
