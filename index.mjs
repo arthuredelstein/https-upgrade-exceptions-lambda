@@ -3,12 +3,14 @@ import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
 import { sendToSQS } from './util.mjs';
 import { putJSON } from './s3.mjs';
+import { ssim } from "ssim.js";
+import pMap from 'p-map';
+import { fstat } from 'fs';
 
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
 
-const getScreenshotHash = async (page) => {
-  const image = await page.screenshot({ type: "png" });
-  const hash = crypto.createHash('sha256').update(image).digest('hex');
+const hashString = (content) => {
+  const hash = crypto.createHash('sha256').update(content).digest('hex');
   return hash.substring(0, 16);
 };
 
@@ -52,11 +54,14 @@ export const pageTest = async (browser, url) => {
   });
   let errorMessage = null;
   let img_hash = null;
+  let img_file = null;
+  let image = null;
   try {
     await Promise.all(
       [await page.goto(url, { waitUntil: 'load' }),
       await sleep(5000)]);
-    img_hash = await getScreenshotHash(page);
+    image = await page.screenshot({ type: "png" });
+    img_hash = hashString(image);
   } catch (e) {
     errorMessage = e.message;
   }
@@ -68,7 +73,7 @@ export const pageTest = async (browser, url) => {
       final_status = response.status;
     }
   }
-  return { responses, final_status, final_url, err: errorMessage, img_hash };
+  return { responses, final_status, final_url, err: errorMessage, img_hash, image };
 };
 
 export const domainTest = async (browser, domain) => {
@@ -78,7 +83,26 @@ export const domainTest = async (browser, domain) => {
   ]);
   const img_hash_match = insecure.img_hash === secure.img_hash;
   const final_url_match = insecure.final_url === secure.final_url;
-  return { domain, insecure, secure, img_hash_match, final_url_match };
+  //console.log("captured ", domain);
+  let mssim;
+  try {
+    if (!img_hash_match && secure.img_file !== null && insecure.img_file !== null) {
+      mssim = ssim(
+        {data: insecure.image, width: 800, height: 600},
+        {data: secure.image, width: 800, height: 600}
+      ).mssim;
+    }
+  } catch (e) {
+    //console.log(e);
+  }
+  delete secure.image;
+  delete insecure.image;
+  return { domain, insecure, secure, img_hash_match, final_url_match, mssim };
+};
+
+const compareImages = async (browser, domain) => {
+  const result = await domainTest(browser, domain);
+  console.log(domain, result.mssim);
 };
 
 const resultQueueUrl = "https://sqs.us-west-1.amazonaws.com/275005321946/result-queue";
