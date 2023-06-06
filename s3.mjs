@@ -124,9 +124,10 @@ const selectObjects = async (path, names, filter) => {
   const filteredObjects = [];
   let i = 0;
   for (const name of names) {
-    const fileName = `raw/${path}/${name}`;
-    const object = JSON.parse(await fsPromise.readFile(fileName));
+    const fileName = `${path}/${name}`;
+    let object;
     try {
+      object = JSON.parse(await fsPromise.readFile(fileName));
       if (filter(object)) {
         filteredObjects.push(name);
       }
@@ -140,3 +141,30 @@ const selectObjects = async (path, names, filter) => {
   }
   return filteredObjects;
 }
+
+const step1Filter = item => {
+  return item.insecure.final_url !== item.secure.final_url;
+};
+
+const step2Filter = item => item.secure.err === null;
+
+// Are we not seeing an http error?
+const step3Filter = item => item.secure.final_status < 400;
+
+// Do the images match exactly?
+const step4Filter = item => item.insecure.img_hash !== item.secure.img_hash;
+
+// Is it just a redirect?
+const step5Filter = item => !justRedirects(item);
+
+const step6Filter = item => urlEssence(item.insecure.final_url) !== urlEssence(item.secure.final_url);
+
+const runFilters = async (path, names) => {
+  const stepFilters = [step1Filter, step2Filter, step3Filter];
+  const i = 0;
+  for await (const stepFilter of stepFilters) {
+    const step = await selectObjects(path, names, stepFilter);
+    console.log(`step ${i}: ${step.length}`);
+    await fsPromise.writeFile(`step${i}`, JSON.stringify(step));
+  }
+};
