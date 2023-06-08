@@ -1,15 +1,14 @@
-import { SQSClient, AddPermissionCommand } from '@aws-sdk/client-sqs';
+import { SQSClient, SendMessageCommand, SendMessageBatchCommand } from '@aws-sdk/client-sqs';
 
 const client = new SQSClient({ region: 'us-west-1' });
 
 export const sendToSQS = (url, messageObject) => {
   const params = {
-    // Remove DelaySeconds parameter and value for FIFO queues
     DelaySeconds: 0,
     MessageBody: JSON.stringify(messageObject),
     QueueUrl: url
   };
-  const command = new AddPermissionCommand(params);
+  const command = new SendMessageCommand(params);
   return client.send(command);
 };
 
@@ -21,6 +20,6 @@ export const sendBatchToSQS = (url, messageObjectArray) => {
     })),
     QueueUrl: url
   };
-  const command = new AddPermissionCommand(params);
+  const command = new SendMessageBatchCommand(params);
   return client.send(command);
 };
