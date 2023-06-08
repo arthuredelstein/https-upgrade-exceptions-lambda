@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
 import { putJSON } from './s3.mjs';
 import { ssim } from 'ssim.js';
-const crx = require('crx-util');
+import crx from 'crx-util';
 
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
