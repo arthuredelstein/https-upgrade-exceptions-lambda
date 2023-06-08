@@ -1,6 +1,6 @@
-import { SQSClient, AddPermissionCommand } from "@aws-sdk/client-sqs";
+import { SQSClient, AddPermissionCommand } from '@aws-sdk/client-sqs';
 
-const client = new SQSClient({ region: "us-west-1" });
+const client = new SQSClient({ region: 'us-west-1' });
 
 export const sendToSQS = (url, messageObject) => {
   const params = {

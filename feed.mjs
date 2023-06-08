@@ -1,7 +1,7 @@
 import { get as getTrancoData } from './brave/tranco.js';
 import { sendBatchToSQS } from './util.mjs';
 
-const domainQueue = "https://sqs.us-west-1.amazonaws.com/275005321946/domain-queue";
+const domainQueue = 'https://sqs.us-west-1.amazonaws.com/275005321946/domain-queue';
 
 const chunk = (array, n) => {
   const chunks = [];
@@ -17,17 +17,17 @@ const chunk = (array, n) => {
     chunks.push(chunk);
   }
   return chunks;
-}
+};
 
 const getChunkedDomains = async (total, chunkSize) => {
   const { domains } = await getTrancoData(total);
   return chunk(domains, chunkSize);
-}
+};
 
 export const handler = async (event, context) => {
   const domains = await getChunkedDomains(event.count, 10);
   const resultPromises = [];
-  const timeStamp = new Date().toISOString().slice(0,19).replace(/[-:]/g,"");
+  const timeStamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '');
   for (const batch of domains) {
     const resultPromise = sendBatchToSQS(domainQueue, batch.map(domain => ({ domain, timeStamp })));
     resultPromises.push(resultPromise);

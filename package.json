@@ -9,6 +9,10 @@
   },
   "author": "Arthur Edelstein <aedelstein@brave.com>",
   "license": "ISC",
+  "eslintConfig": {
+    "ecmaVersion": "2022",
+    "sourceType": "module"
+  },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.338.0",
     "@aws-sdk/client-s3": "^3.338.0",
