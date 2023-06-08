@@ -129,7 +129,7 @@ const gBrowser = await createBrowser();
 
 export const handler = async (event, context) => {
   try {
-    console.log({ event: JSON.stringify(event, null, '  '), context: JSON.stringify(event, null, '  ') });
+    console.log({ event: JSON.stringify(event, null, '  '), context: JSON.stringify(context, null, '  ') });
     const messages = event.data ?? event.Records.map(record => JSON.parse(record.body));
     for (const { domain, timeStamp } of messages) {
       try {
