@@ -6,6 +6,8 @@ import { ssim } from 'ssim.js';
 import crx from 'crx-util';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
+Error.stackTraceLimit = Infinity;
+
 puppeteer.use(StealthPlugin());
 
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
