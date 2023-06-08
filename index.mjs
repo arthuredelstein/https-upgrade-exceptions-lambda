@@ -38,7 +38,7 @@ const puppeteerPlatformParameters = {
 const uboURL = 'https://chrome.google.com/webstore/detail/ublock-origin/cjpalhdlnbpafiamejdnhcphjbkeiagm';
 
 const downloadUBO = async () => {
-  return (await crx.downloadByURL(uboURL)).output;
+  return (await crx.downloadByURL(uboURL, "/tmp")).output;
 };
 
 export const createBrowser = async () => {
