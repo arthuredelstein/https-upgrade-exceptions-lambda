@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer-core';
+import puppeteer from 'puppeteer-extra';
 import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
 import { sendToSQS } from './util.mjs';
@@ -6,6 +6,11 @@ import { putJSON } from './s3.mjs';
 import { ssim } from "ssim.js";
 import pMap from 'p-map';
 import { fstat } from 'fs';
+import path from 'node:path';
+const crx = require("crx-util");
+
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
 
@@ -14,21 +19,40 @@ const hashString = (content) => {
   return hash.substring(0, 16);
 };
 
-const puppeteerParameters = {
+const puppeteerDefaultParameters = (extensionPath) => ({
+  args: [
+    `--disable-extensions-except=${extensionPath}`,
+    '--enable-automation'
+  ]
+});
+
+const puppeteerPlatformParameters = {
   linux: {
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
     executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
+    headless: chromium.headless
   },
   darwin: {
     channel:"chrome",
-    headless: true
+    headless: true,
   }
 }
 
+const uboURL = 'https://chrome.google.com/webstore/detail/ublock-origin/cjpalhdlnbpafiamejdnhcphjbkeiagm';
+
+const downloadUBO = async () => {
+  return (await crx.downloadByURL(uboURL)).output;
+}
+
 export const createBrowser = async () => {
-  return puppeteer.launch(puppeteerParameters[process.platform]);
+  const uboPath = await downloadUBO();
+  const parameters = {
+    ...puppeteerDefaultParameters(uboPath),
+    ...puppeteerPlatformParameters[process.platform]
+  };
+  console.log(parameters);
+  return puppeteer.launch(parameters);
 }
 
 const callsToJson = (object, callNames) => {
