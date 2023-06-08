@@ -4,8 +4,8 @@ import chromium from '@sparticuz/chromium';
 import { putJSON } from './s3.mjs';
 import { ssim } from 'ssim.js';
 import crx from 'crx-util';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
