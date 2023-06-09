@@ -32,5 +32,6 @@ export const handler = async (event, context) => {
     const resultPromise = sendBatchToSQS(domainQueue, batch.map(domain => ({ domain, timeStamp })));
     resultPromises.push(resultPromise);
   }
-  await Promise.all(resultPromises);
+  const results = await Promise.allSettled(resultPromises);
+  console.log("sent: ", results.filter(r => r.status === "fulfilled").length);
 };
