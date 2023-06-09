@@ -98,10 +98,8 @@ export const pageTest = async (browser, url) => {
 };
 
 export const domainTest = async (browser, domain) => {
-  const [insecure, secure] = await Promise.all([
-    pageTest(browser, `http://${domain}`),
-    pageTest(browser, `https://${domain}`)
-  ]);
+  const insecure = await pageTest(browser, `http://${domain}`);
+  const secure = await pageTest(browser, `https://${domain}`);
   const imgHashMatch = insecure.imgHash === secure.imgHash;
   const finalUrlMatch = insecure.finalUrl === secure.finalUrl;
   // console.log("captured ", domain);
@@ -127,10 +125,13 @@ const runTestAndPost = async (timeStamp, browser, domain) => {
   return { results, response };
 };
 
-const gBrowser = await createBrowser();
+let gBrowser;
 
 export const handler = async (event, context) => {
   try {
+    if (gBrowser === undefined) {
+      gbrowser = await createBrowser();
+    }
     console.log({ event: JSON.stringify(event, null, '  '), context: JSON.stringify(context, null, '  ') });
     const messages = event.data ?? event.Records.map(record => JSON.parse(record.body));
     for (const { domain, timeStamp } of messages) {

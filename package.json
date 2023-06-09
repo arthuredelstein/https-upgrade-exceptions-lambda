@@ -21,7 +21,7 @@
     "@sparticuz/chromium": "^113.0.1",
     "crx-util": "^1.0.0",
     "p-map": "^6.0.0",
-    "puppeteer-core": "^20.2.0",
+    "puppeteer-core": "19.5.2",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "queue": "^7.0.0",
