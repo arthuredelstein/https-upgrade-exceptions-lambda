@@ -78,16 +78,14 @@ export const pageTest = async (browser, url) => {
   let imgHash = null;
   let image = null;
   try {
-    await Promise.all(
-      [await page.goto(url, { waitUntil: 'load' }),
-        await sleep(5000)]);
+    await page.goto(url, { waitUntil: 'load' });
     image = await page.screenshot({ type: 'png' });
     imgHash = hashString(image);
   } catch (e) {
     errorMessage = e.message;
   }
-  await page.close();
   const finalUrl = page.url();
+  await page.close();
   let finalStatus = null;
   for (const response of responses) {
     if (response.url === finalUrl) {
@@ -130,7 +128,7 @@ let gBrowser;
 export const handler = async (event, context) => {
   try {
     if (gBrowser === undefined) {
-      gbrowser = await createBrowser();
+      gBrowser = await createBrowser();
     }
     console.log({ event: JSON.stringify(event, null, '  '), context: JSON.stringify(context, null, '  ') });
     const messages = event.data ?? event.Records.map(record => JSON.parse(record.body));
