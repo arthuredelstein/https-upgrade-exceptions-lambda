@@ -1,19 +1,20 @@
 import { S3 } from '@aws-sdk/client-s3';
 import pMap from 'p-map';
 import fsPromise from 'node:fs/promises';
+import path from 'node:path';
+import { get as getDomains } from './brave/tranco.js'
+
 
 const client = new S3({});
 
 const httpsUpgradeExceptionsBucket = 'https-upgrade-exceptions';
-let i = 0;
 
 export const getJSON = async (path) => {
   const result = await client.getObject({
     Bucket: httpsUpgradeExceptionsBucket,
     Key: path
   });
-  ++i;
-  console.log(i, path);
+//  console.log(i, path);
   const raw = await result.Body.transformToString();
   return JSON.parse(raw);
 };
@@ -65,13 +66,17 @@ export const objectListIterator = async function * (path) {
 export const getAllNames = async function (path) {
   const bigList = [];
   let ContinuationToken;
+  let i = 0;
   while (true) {
+    ++i;
     const results = await listObjects(path, ContinuationToken);
     for (const item of results.Contents) {
       bigList.push(item);
     }
     ContinuationToken = results.NextContinuationToken;
-    console.log(bigList.length, bigList[bigList.length - 1], ContinuationToken);
+    if (i % 10 === 0) {
+      console.log(bigList.length, bigList[bigList.length - 1], ContinuationToken);
+    }
     if (ContinuationToken === undefined) {
       break;
     }
@@ -83,7 +88,17 @@ export const getAllNames = async function (path) {
 };
 
 export const fetchAndSaveAllObjects = async (keys) => {
-  await pMap(keys, fetchAndSave, { concurrency: 50 });
+  const dir = path.dirname(keys[0]);
+  fsPromise.mkdir(dir, { recursive: true} );
+  let i = 0;
+  const fetchAndSaveMonitored = (path) => {
+    if (i % 1000 === 0) {
+      console.log(i);
+    }
+    ++i;
+    return fetchAndSave(path);
+  }
+  await pMap(keys, fetchAndSaveMonitored, { concurrency: 100 } );
 };
 
 const urlEssence = (urlString) => {
@@ -122,7 +137,7 @@ const justRedirects = value => {
 const selectObjects = async (path, names, filter) => {
   const filteredObjects = [];
   let i = 0;
-  for (const name of names) {
+  const checkName = async (name) => {
     const fileName = `${path}/${name}`;
     let object;
     try {
@@ -138,8 +153,45 @@ const selectObjects = async (path, names, filter) => {
       console.log(i, ':', filteredObjects.length);
     }
   }
+  await pMap(names, checkName, { concurrency: 50 });
   return filteredObjects;
 };
+
+const countObjects = async (path, names) => {
+  const secureStatusCodes = {};
+  const secureErrors = {};
+  const neither = [];
+  let i = 0;
+  const checkItem = async (name) => {
+    ++i;
+    if (i % 1000 === 0) {
+      console.log(i);
+    }
+    const fileName = `${path}/${name}`;
+    let object;
+    try {
+      object = JSON.parse(await fsPromise.readFile(fileName));
+      finalStatus = object.secure.finalStatus;
+      let err = object.secure.err;
+      if (err !== undefined && err !== null) {
+        err = object.secure.err.split(" at ")[0];
+      }
+      if (object.secure.finalStatus < 400 && object.secure.err === null) {
+        neither.push(name);
+      }
+      if (err !== null) {
+        secureErrors[err] = secureErrors[err] ? 1 + secureErrors[err] : 1;
+      }
+      if (finalStatus !== null) {
+        secureStatusCodes[finalStatus] = secureStatusCodes[finalStatus] ? 1 + secureStatusCodes[finalStatus] : 1;
+      }
+    } catch (e) {
+      console.log(name, object, e);
+    }
+  };
+  await pMap(names, checkItem, { concurrency: 50});
+  return { secureErrors, secureStatusCodes, neither }
+}
 
 const step1Filter = item => {
   return item.insecure.finalUrl !== item.secure.finalUrl;
@@ -157,6 +209,8 @@ const step4Filter = item => item.insecure.imgHash !== item.secure.imgHash;
 const step5Filter = item => !justRedirects(item);
 
 const step6Filter = item => urlEssence(item.insecure.finalUrl) !== urlEssence(item.secure.finalUrl);
+
+const step7Filter = item => item.mssim > 0.9;
 
 export const runFilters = async (path, names) => {
   const stepFilters = [step1Filter, step2Filter, step3Filter, step4Filter, step5Filter, step6Filter];
