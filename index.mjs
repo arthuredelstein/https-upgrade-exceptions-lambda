@@ -61,8 +61,11 @@ const callsToJson = (object, callNames) => {
   return result;
 };
 
-const responseToJson = (responseObject) =>
-  callsToJson(responseObject, ['status', 'statusText', 'url']);
+const responseToJson = (responseObject) => {
+  const result = callsToJson(responseObject, ['status', 'url']);
+  result['contentType'] = responseObject.headers()["content-type"];
+  return result;
+}
 
 export const pageTest = async (browser, url) => {
   const responses = [];
@@ -71,7 +74,7 @@ export const pageTest = async (browser, url) => {
   page.on('response', interceptedResponse => {
     const responseJson = responseToJson(interceptedResponse);
     if (responseJson.url.startsWith('http')) {
-      responses.push(responseToJson(interceptedResponse));
+      responses.push(responseJson);
     }
   });
   let errorMessage = null;
