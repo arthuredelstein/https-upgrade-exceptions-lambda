@@ -62,7 +62,7 @@ const callsToJson = (object, callNames) => {
 };
 
 const responseToJson = (responseObject) => {
-  const result = callsToJson(responseObject, ['status', 'statusText', 'url']);
+  const result = callsToJson(responseObject, ['status', 'url']);
   result['contentType'] = responseObject.headers()["content-type"];
   return result;
 }
