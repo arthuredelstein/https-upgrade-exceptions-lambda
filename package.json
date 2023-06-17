@@ -20,7 +20,6 @@
     "@aws-sdk/lib-dynamodb": "^3.338.0",
     "@sparticuz/chromium": "^113.0.1",
     "crx-util": "https://github.com/arthuredelstein/node-crx-util/tree/remove_request",
-    "fix": "^0.0.6",
     "jimp": "^0.22.8",
     "p-map": "^6.0.0",
     "puppeteer-core": "19.5.2",
