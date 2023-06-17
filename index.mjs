@@ -1,21 +1,16 @@
 import puppeteer from 'puppeteer-extra';
-import crypto from 'crypto';
 import chromium from '@sparticuz/chromium';
 import { putJSON } from './s3.mjs';
 import { ssim } from 'ssim.js';
 import crx from 'crx-util';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import Jimp from 'jimp';
 
 Error.stackTraceLimit = Infinity;
 
 puppeteer.use(StealthPlugin());
 
-const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
-
-const hashString = (content) => {
-  const hash = crypto.createHash('sha256').update(content).digest('hex');
-  return hash.substring(0, 16);
-};
+export const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
 
 const puppeteerDefaultParameters = (extensionPath) => ({
   args: [
@@ -78,12 +73,15 @@ export const pageTest = async (browser, url) => {
     }
   });
   let errorMessage = null;
-  let imgHash = null;
   let image = null;
   try {
     await page.goto(url, { waitUntil: 'load' });
-    image = await page.screenshot({ type: 'png' });
-    imgHash = hashString(image);
+    const imgIndex = url.startsWith("http://") ? "1" : "2";
+    image = await page.screenshot({
+      type: 'png',
+      path: `/tmp/img${imgIndex}.png`,
+      clip: { x: 0, y: 0, width: 800, height: 600 }
+    });
   } catch (e) {
     errorMessage = e.message;
   }
@@ -95,29 +93,22 @@ export const pageTest = async (browser, url) => {
       finalStatus = response.status;
     }
   }
-  return { responses, finalStatus, finalUrl, err: errorMessage, imgHash, image };
+  return { responses, finalStatus, finalUrl, err: errorMessage };
 };
 
 export const domainTest = async (browser, domain) => {
   const insecure = await pageTest(browser, `http://${domain}`);
   const secure = await pageTest(browser, `https://${domain}`);
-  const imgHashMatch = insecure.imgHash === secure.imgHash;
   const finalUrlMatch = insecure.finalUrl === secure.finalUrl;
-  // console.log("captured ", domain);
   let mssim;
+  const img1 = await Jimp.read("/tmp/img1.png");
+  const img2 = await Jimp.read("/tmp/img2.png");
   try {
-    if (!imgHashMatch) {
-      mssim = ssim(
-        { data: insecure.image, width: 800, height: 600 },
-        { data: secure.image, width: 800, height: 600 }
-      ).mssim;
-    }
+    mssim = ssim(img1.bitmap, img2.bitmap).mssim;
   } catch (e) {
     // console.log(e);
   }
-  delete secure.image;
-  delete insecure.image;
-  return { domain, insecure, secure, imgHashMatch, finalUrlMatch, mssim };
+  return { domain, insecure, secure, finalUrlMatch, mssim };
 };
 
 const runTestAndPost = async (timeStamp, browser, domain) => {
