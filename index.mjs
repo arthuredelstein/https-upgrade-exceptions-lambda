@@ -121,7 +121,7 @@ let gBrowser;
 
 export const handler = async (event, context) => {
   try {
-    if (gBrowser === undefined) {
+    if (gBrowser === undefined || !gBrowser.isConnected()) {
       gBrowser = await createBrowser();
     }
     console.log({ event: JSON.stringify(event, null, '  '), context: JSON.stringify(context, null, '  ') });
