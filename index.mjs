@@ -73,16 +73,17 @@ export const pageTest = async (browser, url) => {
     }
   });
   let errorMessage = null;
-  let image = null;
   try {
     await page.goto(url, { waitUntil: 'load' });
-    const imgIndex = url.startsWith("http://") ? "1" : "2";
-    await sleep(1000); // extra sleep helps pages to settle
-    image = await page.screenshot({
-      type: 'png',
-      path: `/tmp/img${imgIndex}.png`,
-      clip: { x: 0, y: 0, width: 800, height: 600 }
-    });
+    const imgType = url.startsWith("http://") ? "insecure" : "secure";
+    for (let i = 0; i < 5; ++i) {
+      await sleep(1000); // extra sleep helps pages to settle
+      await page.screenshot({
+        type: 'png',
+        path: `/tmp/img-${imgType}-${i}.png`,
+        clip: { x: 0, y: 0, width: 800, height: 600 }
+      });
+    }
   } catch (e) {
     errorMessage = e.message;
   }
@@ -97,18 +98,33 @@ export const pageTest = async (browser, url) => {
   return { responses, finalStatus, finalUrl, err: errorMessage };
 };
 
+const findBestMssim = async () => {
+  let bestMssim = 0;
+  for (let i = 0; i < 5; ++i) {
+    for (let j = 0; j < 5; ++j) {
+      const img1 = await Jimp.read(`/tmp/img-insecure-${i}.png`);
+      const img2 = await Jimp.read(`/tmp/img-secure-${j}.png`);
+      try {
+        const mssim = ssim(img1.bitmap, img2.bitmap).mssim;
+        if (mssim > bestMssim) {
+          bestMssim = mssim;
+          if (bestMssim > 0.99) {
+            return bestMssim;
+          }
+        }
+      } catch (e) {
+        // console.log(e);
+      }
+    }
+  }
+  return bestMssim;
+}
+
 export const domainTest = async (browser, domain) => {
   const insecure = await pageTest(browser, `http://${domain}`);
   const secure = await pageTest(browser, `https://${domain}`);
   const finalUrlMatch = insecure.finalUrl === secure.finalUrl;
-  let mssim;
-  const img1 = await Jimp.read("/tmp/img1.png");
-  const img2 = await Jimp.read("/tmp/img2.png");
-  try {
-    mssim = ssim(img1.bitmap, img2.bitmap).mssim;
-  } catch (e) {
-    // console.log(e);
-  }
+  const mssim = await findBestMssim();
   return { domain, insecure, secure, finalUrlMatch, mssim };
 };
 
