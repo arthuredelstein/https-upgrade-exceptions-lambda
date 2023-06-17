@@ -77,6 +77,7 @@ export const pageTest = async (browser, url) => {
   try {
     await page.goto(url, { waitUntil: 'load' });
     const imgIndex = url.startsWith("http://") ? "1" : "2";
+    await sleep(1000); // extra sleep helps pages to settle
     image = await page.screenshot({
       type: 'png',
       path: `/tmp/img${imgIndex}.png`,
