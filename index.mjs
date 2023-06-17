@@ -62,6 +62,8 @@ const responseToJson = (responseObject) => {
   return result;
 }
 
+const numScreenshots = 1;
+
 export const pageTest = async (browser, url) => {
   const responses = [];
   const page = await browser.newPage();
@@ -76,7 +78,7 @@ export const pageTest = async (browser, url) => {
   try {
     await page.goto(url, { waitUntil: 'load' });
     const imgType = url.startsWith("http://") ? "insecure" : "secure";
-    for (let i = 0; i < 5; ++i) {
+    for (let i = 0; i < numScreenshots; ++i) {
       await sleep(1000); // extra sleep helps pages to settle
       await page.screenshot({
         type: 'png',
@@ -100,8 +102,8 @@ export const pageTest = async (browser, url) => {
 
 const findBestMssim = async () => {
   let bestMssim = 0;
-  for (let i = 0; i < 5; ++i) {
-    for (let j = 0; j < 5; ++j) {
+  for (let i = 0; i < numScreenshots; ++i) {
+    for (let j = 0; j < numScreenshots; ++j) {
       const img1 = await Jimp.read(`/tmp/img-insecure-${i}.png`);
       const img2 = await Jimp.read(`/tmp/img-secure-${j}.png`);
       try {
