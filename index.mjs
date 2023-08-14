@@ -62,7 +62,7 @@ const responseToJson = (responseObject) => {
   return result;
 }
 
-const numScreenshots = 1;
+const numScreenshots = 5;
 
 export const pageTest = async (browser, url) => {
   const responses = [];
