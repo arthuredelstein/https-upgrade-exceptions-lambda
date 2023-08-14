@@ -3,13 +3,14 @@ import pMap from 'p-map';
 import fsPromise from 'node:fs/promises';
 import path from 'node:path';
 import { get as getDomains } from './brave/tranco.js'
-
+import _ from 'lodash';
+import moize from 'moize';
 
 const client = new S3({});
 
 const httpsUpgradeExceptionsBucket = 'https-upgrade-exceptions';
 
-export const getJSON = async (path) => {
+export const getJSON_raw = async (path) => {
   const result = await client.getObject({
     Bucket: httpsUpgradeExceptionsBucket,
     Key: path
@@ -18,6 +19,8 @@ export const getJSON = async (path) => {
   const raw = await result.Body.transformToString();
   return JSON.parse(raw);
 };
+
+const getJSON = moize(getJSON_raw);
 
 export const putJSON = (path, jsonObject) =>
   client.putObject({
@@ -105,11 +108,7 @@ const urlEssence = (urlString) => {
   const url = new URL(urlString);
   url.search = '';
   const newURL = url.href
-    .replace(/^https:\/\//, '')
-    .replace(/^http:\/\//, '')
     .replace(/^www\./, '')
-    .replace(/^m\./, '')
-    .replace(/\/en\/$/, '/')
     .replace(/index\.html$/, '')
     .replace(/index\.htm$/, '')
     .replace(/index\.php$/, '')
@@ -134,30 +133,48 @@ const justRedirects = value => {
   return false;
 };
 
-const selectObjects = async (path, names, filter) => {
-  const filteredObjects = [];
+
+const useRemote = true;
+
+const selectObjects = async (names, filter) => {
+  const yes = [];
+  const no = [];
   let i = 0;
   const checkName = async (name) => {
-    const fileName = `${path}/${name}`;
     let object;
     try {
-      object = JSON.parse(await fsPromise.readFile(fileName));
+      object = useRemote ? await getJSON(name)
+                         : JSON.parse(await fsPromise.readFile(name));
       if (filter(object)) {
-        filteredObjects.push(name);
+        yes.push(name);
+      } else {
+        no.push(name);
       }
     } catch (e) {
       console.log(name, object, e);
     }
     ++i;
     if (i % 1000 === 0) {
-      console.log(i, ':', filteredObjects.length);
+      console.log(i, ':', yes.length, no.length);
     }
   }
   await pMap(names, checkName, { concurrency: 50 });
-  return filteredObjects;
+  console.log(i, ':', yes.length, no.length);
+  return { yes, no };
 };
 
-const countObjects = async (path, names) => {
+const funnel = async (names, filters) => {
+  const results = [names];
+  let suspects = names;
+  for (const [filterName, filter] of Object.entries(filters)) {
+    const { yes, no } = await selectObjects(suspects, filter);
+    suspects = no;
+    results.push([filterName, suspects]);
+  }
+  return Object.fromEntries(results);
+};
+
+const countObjects = async (names) => {
   const secureStatusCodes = {};
   const secureErrors = {};
   const neither = [];
@@ -167,10 +184,10 @@ const countObjects = async (path, names) => {
     if (i % 1000 === 0) {
       console.log(i);
     }
-    const fileName = `${path}/${name}`;
     let object;
     try {
-      object = JSON.parse(await fsPromise.readFile(fileName));
+      object = useRemote ? await getJSON(name)
+                         : JSON.parse(await fsPromise.readFile(name));
       finalStatus = object.secure.finalStatus;
       let err = object.secure.err;
       if (err !== undefined && err !== null) {
@@ -193,31 +210,42 @@ const countObjects = async (path, names) => {
   return { secureErrors, secureStatusCodes, neither }
 }
 
-const step1Filter = item => {
-  return item.insecure.finalUrl !== item.secure.finalUrl;
+const finalUrlsMatch = item => {
+  return item.insecure.finalUrl === item.secure.finalUrl;
 };
 
-const step2Filter = item => item.secure.err === null;
+const secureSecurityError = item => item.secure.err !== null;
 
-// Are we not seeing an http error?
-const step3Filter = item => item.secure.finalStatus < 400;
+const secureHttpError = item => item.secure.finalStatus >= 400;
 
-// Do the images match exactly?
-const step4Filter = item => item.insecure.imgHash !== item.secure.imgHash;
+const insecureSecurityError = item => item.insecure.err !== null;
 
-// Is it just a redirect?
-const step5Filter = item => !justRedirects(item);
+const insecureHttpError = item => item.insecure.finalStatus >= 400;
 
-const step6Filter = item => urlEssence(item.insecure.finalUrl) !== urlEssence(item.secure.finalUrl);
+const initialScreenshotsSimilar = item => item.mssim >= 0.90;
 
-const step7Filter = item => item.mssim > 0.9;
+const cdnpark = item => 
+  item.insecure.responses.filter(r => r.url.includes("i.cdnpark.com/registrar/v3/loader.js")).length > 0;
 
-export const runFilters = async (path, names) => {
-  const stepFilters = [step1Filter, step2Filter, step3Filter, step4Filter, step5Filter, step6Filter];
-  const i = 0;
-  for await (const stepFilter of stepFilters) {
-    const step = await selectObjects(path, names, stepFilter);
-    console.log(`step ${i}: ${step.length}`);
-    await fsPromise.writeFile(`step${i}`, JSON.stringify(step));
-  }
+const sedoparking = item => 
+  item.insecure.responses.filter(r => r.url.includes("img.sedoparking.com")).length > 0;
+
+const parkingLander = item => 
+  item.insecure.responses.filter(r => r.url.includes("img1.wsimg.com/parking-lander/static/js")).length > 0;
+
+const insecureParking = item => cdnpark(item) || sedoparking(item) || parkingLander(item);
+
+const runStandardFunnel = async (path) => {
+  const names = await getAllNames("raw/" + path);
+  const results = await funnel(names,
+    {
+      finalUrlsMatch,
+      secureSecurityError,
+      secureHttpError,
+      initialScreenshotsSimilar,
+      insecureSecurityError,
+      insecureHttpError,
+      insecureParking
+    });
+  return results;
 };
