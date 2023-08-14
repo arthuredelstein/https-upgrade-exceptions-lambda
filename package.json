@@ -21,6 +21,8 @@
     "@sparticuz/chromium": "^113.0.1",
     "crx-util": "https://github.com/arthuredelstein/node-crx-util/tree/remove_request",
     "jimp": "^0.22.8",
+    "lodash": "^4.17.21",
+    "moize": "^6.1.6",
     "p-map": "^6.0.0",
     "puppeteer-core": "19.5.2",
     "puppeteer-extra": "^3.3.6",

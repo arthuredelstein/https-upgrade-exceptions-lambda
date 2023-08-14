@@ -62,9 +62,7 @@ const responseToJson = (responseObject) => {
   return result;
 }
 
-const numScreenshots = 5;
-
-export const pageTest = async (browser, url) => {
+export const pageTest = async (browser, url, numScreenshots) => {
   const responses = [];
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(20000);
@@ -100,7 +98,7 @@ export const pageTest = async (browser, url) => {
   return { responses, finalStatus, finalUrl, err: errorMessage };
 };
 
-const findBestMssim = async () => {
+const findBestMssim = async (numScreenshots) => {
   let bestMssim = 0;
   for (let i = 0; i < numScreenshots; ++i) {
     for (let j = 0; j < numScreenshots; ++j) {
@@ -122,16 +120,16 @@ const findBestMssim = async () => {
   return bestMssim;
 }
 
-export const domainTest = async (browser, domain) => {
-  const insecure = await pageTest(browser, `http://${domain}`);
-  const secure = await pageTest(browser, `https://${domain}`);
+export const domainTest = async (browser, domain, numScreenshots) => {
+  const insecure = await pageTest(browser, `http://${domain}`, numScreenshots);
+  const secure = await pageTest(browser, `https://${domain}`, numScreenshots);
   const finalUrlMatch = insecure.finalUrl === secure.finalUrl;
-  const mssim = await findBestMssim();
+  const mssim = await findBestMssim(numScreenshots);
   return { domain, insecure, secure, finalUrlMatch, mssim };
 };
 
-const runTestAndPost = async (timeStamp, browser, domain) => {
-  const results = await domainTest(browser, domain);
+const runTestAndPost = async (timeStamp, browser, domain, numScreenshots = 1) => {
+  const results = await domainTest(browser, domain, numScreenshots);
   const response = await putJSON(`raw/${timeStamp}/${domain}`, results);
   return { results, response };
 };
@@ -145,9 +143,9 @@ export const handler = async (event, context) => {
     }
     console.log({ event: JSON.stringify(event, null, '  '), context: JSON.stringify(context, null, '  ') });
     const messages = event.data ?? event.Records.map(record => JSON.parse(record.body));
-    for (const { domain, timeStamp } of messages) {
+    for (const { domain, timeStamp, numScreenshots } of messages) {
       try {
-        const { results, response } = await runTestAndPost(timeStamp, gBrowser, domain);
+        const { results, response } = await runTestAndPost(timeStamp, gBrowser, domain, numScreenshots);
         console.log('send succeeded:', JSON.stringify(results), JSON.stringify(response));
       } catch (e) {
         console.log('send failed:', domain, e);
