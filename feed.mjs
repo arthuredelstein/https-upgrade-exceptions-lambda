@@ -1,7 +1,5 @@
 import { get as getTrancoData } from './brave/tranco.js';
 import { sendBatchToSQS } from './util.mjs';
-import fsPromise from 'node:fs/promises';
-
 
 const domainQueue = 'https://sqs.us-west-1.amazonaws.com/275005321946/domain-queue';
 
@@ -34,9 +32,10 @@ const sendDomainsToSQS = async (domains) => {
     resultPromises.push(resultPromise);
   }
   const results = await Promise.allSettled(resultPromises);
-  console.log("sent: ", results.filter(r => r.status === "fulfilled").length);
+  console.log("batches sent: ", results.filter(r => r.status === "fulfilled").length);
 };
 
 export const handler = async (event, context) => {
   const domains = await getChunkedDomains(event.count, 10);
+  await sendDomainsToSQS(domains);
 };
