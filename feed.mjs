@@ -27,11 +27,11 @@ const sendDomainsToSQS = async (domains, timeStamp, numScreenshots = 1) => {
     resultPromises.push(resultPromise);
   }
   const results = await Promise.allSettled(resultPromises);
-  console.log({timeStamp}, "batches sent: ", results.filter(r => r.status === "fulfilled").length);
+  console.log({ timeStamp }, 'batches sent: ', results.filter(r => r.status === 'fulfilled').length);
 };
 
 const saveDomainListToBucket = async (domains, timestamp) => {
-  await putText(`domainListSnapshots/${timestamp}`, domains.join("\n"));
+  await putText(`domainListSnapshots/${timestamp}`, domains.join('\n'));
 };
 
 const createTimeStamp = () => new Date().toISOString().slice(0, 19).replace(/[-:]/g, '');
@@ -39,15 +39,15 @@ const createTimeStamp = () => new Date().toISOString().slice(0, 19).replace(/[-:
 export const handler = async (event, context) => {
   const { domains } = await getTrancoData(event.count);
   const timestamp = createTimeStamp();
-  await saveDomainListToBucket(domains, timestamp)
+  await saveDomainListToBucket(domains, timestamp);
   const chunkedDomains = chunk(domains, 10);
   await sendDomainsToSQS(chunkedDomains, timestamp);
 };
 
 export const followUpRun = async (filename) => {
   const raw = JSON.parse(await fsPromise.readFile(filename));
-  const finalDomainList = raw.insecureParking.map(x => x.split("/").slice(-1)[0]);
-  console.log(finalDomainList.slice(0,3), "...");
+  const finalDomainList = raw.insecureParking.map(x => x.split('/').slice(-1)[0]);
+  console.log(finalDomainList.slice(0, 3), '...');
   const chunkedFinalDomainList = chunk(finalDomainList, 10);
   await sendDomainsToSQS(chunkedFinalDomainList, createTimeStamp(), 5);
-}
+};
