@@ -1,34 +1,11 @@
-import { S3 } from '@aws-sdk/client-s3';
 import pMap from 'p-map';
 import fsPromise from 'node:fs/promises';
 import path from 'node:path';
-import { get as getDomains } from './brave/tranco.js'
 import _ from 'lodash';
-import moize from 'moize';
-
-const client = new S3({});
+import { stringify } from 'csv-stringify/sync';
+import { getJSON } from './util.mjs';
 
 const httpsUpgradeExceptionsBucket = 'https-upgrade-exceptions';
-
-export const getJSON_raw = async (path) => {
-  const result = await client.getObject({
-    Bucket: httpsUpgradeExceptionsBucket,
-    Key: path
-  });
-//  console.log(i, path);
-  const raw = await result.Body.transformToString();
-  return JSON.parse(raw);
-};
-
-const getJSON = moize(getJSON_raw);
-
-export const putJSON = (path, jsonObject) =>
-  client.putObject({
-    Bucket: httpsUpgradeExceptionsBucket,
-    Key: path,
-    Body: JSON.stringify(jsonObject),
-    ContentType: 'application/json'
-  });
 
 export const listObjects = (path, ContinuationToken) =>
   client.listObjectsV2({
@@ -104,35 +81,9 @@ export const fetchAndSaveAllObjects = async (keys) => {
   await pMap(keys, fetchAndSaveMonitored, { concurrency: 100 } );
 };
 
-const urlEssence = (urlString) => {
-  const url = new URL(urlString);
-  url.search = '';
-  const newURL = url.href
-    .replace(/^www\./, '')
-    .replace(/index\.html$/, '')
-    .replace(/index\.htm$/, '')
-    .replace(/index\.php$/, '')
-    .replace(/\/+$/, '')
-    .replace(/ww[0-9][0-9]\./, 'www.')
-    .replace(/subid1=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/, '');
-  return newURL;
-};
-
 export const readObject = async fileName => {
   return JSON.parse(await fsPromise.readFile(fileName));
 };
-
-const justRedirects = value => {
-  if (value.secure.responses.length > 10 &&
-    value.insecure.responses.length > 10 &&
-    value.secure.responses.length + 1 === value.insecure.responses.length &&
-    value.insecure.responses[0].status >= 300 &&
-    value.insecure.responses[0].status < 400) {
-    return true;
-  }
-  return false;
-};
-
 
 const useRemote = true;
 
@@ -164,7 +115,7 @@ const selectObjects = async (names, filter) => {
 };
 
 const funnel = async (names, filters) => {
-  const results = [names];
+  const results = [['base', names]];
   let suspects = names;
   for (const [filterName, filter] of Object.entries(filters)) {
     const { yes, no } = await selectObjects(suspects, filter);
@@ -173,6 +124,29 @@ const funnel = async (names, filters) => {
   }
   return Object.fromEntries(results);
 };
+
+const analyzeObjects = async (names, filters) => {
+  let i = 0;
+  const allResults = {};
+  const analyzeName = async (name) => {
+    const results = {};
+    try {
+      const rawData = await getJSON(name);
+      for (const [filterName, filter] of Object.entries(filters)) {
+        results[filterName] = filter(rawData);
+      }
+    } catch (e) {
+      console.log(name, e);
+    }
+    if (i % 1000 === 0) {
+      console.log(name, i, JSON.stringify(results))
+    }
+    ++i;
+    allResults[name] = results;
+  }
+  await pMap(names, analyzeName, { concurrency: 50 });
+  return allResults;
+}
 
 const countObjects = async (names) => {
   const secureStatusCodes = {};
@@ -249,3 +223,160 @@ const runStandardFunnel = async (path) => {
     });
   return results;
 };
+
+const runStandardAnalysis = async (path) => {
+  const names = await getAllNames("raw/" + path);
+  const results = await analyzeObjects(names, {
+    finalUrlsMatch,
+    secureSecurityError,
+    secureHttpError,
+    initialScreenshotsSimilar,
+    insecureSecurityError,
+    insecureHttpError,
+    insecureParking
+  }); 
+  return results;
+}
+
+const sortMap = (m) => {
+  const newMap = {};
+  const keys = Object.keys(m);
+  keys.sort();
+  for (const k of keys) {
+    newMap[k] = m[k];
+  }
+  return newMap;
+}
+
+const analysisCounts = async(data) => {
+  const entries = Object.entries(data);
+  const counts = {};
+  for (const [name, result] of entries) {
+    for (const [key, val] of Object.entries(result)) {
+      if (val) {
+        counts[key] = 1 + (counts[key] ?? 0);
+      }
+    }
+  }
+  return sortMap(counts);
+};
+
+const analyzeAll = async(data) => {
+  return Promise.all(data.map(analysisCounts));
+}
+
+const printStuff = async (results) => {
+  for (const [category, domains] of Object.entries(results)) {
+    console.log(domains.length);
+  }
+}
+
+const runFollowupFunnel = async (path) => {
+  const names = await getAllNames("raw/" + path);
+  const results = await selectObjects(names, initialScreenshotsSimilar);
+  return results;
+}
+
+const countResources = (item, URL) =>
+  item.responses.filter(
+    r => r.url.includes(URL)).length > 0;
+
+const parkingResourceURLs = [
+  "i.cdnpark.com/registrar/v3/loader.js",
+  "img.sedoparking.com",
+  "img1.wsimg.com/parking-lander/static/js"
+];
+
+const analyzeFailures = (item) => {
+  if (item.err && item.err.startsWith("Navigation timeout")) {
+    return "navigationTimeout";
+  }
+  if (item.err && item.err.startsWith("net::")) {
+    return "networkError";
+  }
+  if (item.err) {
+    console.log("unexpected error:", item.err);
+  }
+  if (item.finalStatus && item.finalStatus >= 400) {
+    return "httpError";
+  }
+  const parkingCounts = parkingResourceURLs.map(url => countResources(item, url));
+  if (parkingCounts.filter(x => x > 0).length > 0) {
+    return "parking";
+  }
+  return "success";
+};
+
+export const secondAnalysis = async (names) => {
+  let i = 0;
+  const statusDyads = {};
+  const navigationSuccesses = { "match": 0, "similarImages": 0, "different": 0};
+  const checkItem = async (name) => {
+    try {
+      const obj = await getJSON(name);
+      const insecureStatus = analyzeFailures(obj.insecure);
+      const secureStatus = analyzeFailures(obj.secure);
+      statusDyads[insecureStatus] ??= {};
+      statusDyads[insecureStatus][secureStatus] ??= 0;
+      ++statusDyads[insecureStatus][secureStatus];
+      if (insecureStatus === "success" && secureStatus === "success") {
+        if (obj.insecure.finalUrl === obj.secure.finalUrl) {
+          ++navigationSuccesses["match"];
+        } else if (obj.mssim > 0.9) {
+          ++navigationSuccesses["similarImages"];
+        } else {
+          ++navigationSuccesses["different"];
+        }
+      }
+      ++i;
+      if (i % 1000 === 0) {
+        console.log(i, name);
+      }
+    } catch (e) {
+      console.log(name, "failed", e);
+    }
+  }
+  await pMap(names, checkItem, { concurrency: 50});
+  return { statusDyads, navigationSuccesses };
+}
+
+const statusValues = [
+  "navigationTimeout",
+  "networkError",
+  "httpError",
+  "parking",
+  "success"
+];
+
+
+const statusDyadsToCsv = (data) => {
+  const headerRow = ["insecure\\secure", ...statusValues];
+  const table = [headerRow];
+  for (const rowName of statusValues) {
+    const rowData = [rowName];
+    for (const colName of statusValues) {
+      rowData.push(data[rowName][colName]);
+    }
+    table.push(rowData)
+  }
+  return stringify(table);
+}
+
+const navigationSuccessesToCSV = (data) => {
+  const table = [];
+  for (const [key, value] of Object.entries(data)) {
+    table.push([key, value]);
+  }
+  return stringify(table);
+}
+
+const writeAnalysisFile = async (filename, results) => {
+  const dyads = statusDyadsToCsv(results.statusDyads);
+  const successes = navigationSuccessesToCSV(results.navigationSuccesses);
+  await fsPromise.writeFile(filename, dyads + "\n\n\n" + successes);
+}
+
+const analyzeBothFailures = (obj) => {
+
+  return { secureStatus, insecureStatus };
+}
