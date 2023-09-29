@@ -96,7 +96,7 @@ export const pageTest = async (browser, url, numScreenshots) => {
       finalStatus = response.status;
     }
   }
-  return { responses, finalStatus, finalUrl, err: errorMessage };
+  return { responses, finalStatus, finalUrl, err: errorMessage, numScreenshots };
 };
 
 const findBestMssim = async (numScreenshots) => {
