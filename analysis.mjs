@@ -129,24 +129,7 @@ const parkingLander = item =>
 
 const insecureParking = item => cdnpark(item) || sedoparking(item) || parkingLander(item);
 
-const runStandardFunnel = async (path) => {
-  const names = await getAllNames("raw/" + path);
-  const results = await funnel(names,
-    {
-      finalUrlsMatch,
-      secureSecurityError,
-      secureHttpError,
-      initialScreenshotsSimilar,
-      insecureSecurityError,
-      insecureHttpError,
-      insecureParking
-    });
-  return results;
-};
-
-const runStandardAnalysis = async (path) => {
-  const names = await getAllNames("raw/" + path);
-  const results = await analyzeObjects(names, {
+const testsObject = {
     finalUrlsMatch,
     secureSecurityError,
     secureHttpError,
@@ -154,7 +137,25 @@ const runStandardAnalysis = async (path) => {
     insecureSecurityError,
     insecureHttpError,
     insecureParking
-  }); 
+  };
+
+export const analyzeResult = (rawDataObject) => {
+  const result = {};
+  for (const [name, testFn] of Object.entries(testsObject)) {
+    result[name] = testFn(rawDataObject);
+  }
+  return result;
+}
+
+const runStandardFunnel = async (path) => {
+  const names = await getAllNames("raw/" + path);
+  const results = await funnel(names, testObject);
+  return results;
+};
+
+const runStandardAnalysis = async (path) => {
+  const names = await getAllNames("raw/" + path);
+  const results = await analyzeObjects(names, testObject); 
   return results;
 }
 

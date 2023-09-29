@@ -1,10 +1,11 @@
 import puppeteer from 'puppeteer-extra';
 import chromium from '@sparticuz/chromium';
-import { putJSON } from './s3.mjs';
+import { putJSON } from './util.mjs';
 import { ssim } from 'ssim.js';
 import crx from 'crx-util';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import Jimp from 'jimp';
+import { analyzeResult } from './analysis.mjs'
 
 Error.stackTraceLimit = Infinity;
 
@@ -77,7 +78,7 @@ export const pageTest = async (browser, url, numScreenshots) => {
     await page.goto(url, { waitUntil: 'load' });
     const imgType = url.startsWith("http://") ? "insecure" : "secure";
     for (let i = 0; i < numScreenshots; ++i) {
-      await sleep(1000); // extra sleep helps pages to settle
+      await sleep(1000);
       await page.screenshot({
         type: 'png',
         path: `/tmp/img-${imgType}-${i}.png`,
@@ -128,8 +129,25 @@ export const domainTest = async (browser, domain, numScreenshots) => {
   return { domain, insecure, secure, finalUrlMatch, mssim };
 };
 
+const allFailed = (x) => {
+  for (const [name, result] of Object.entries(x)) {
+    if (result !== false) {
+      return false;
+    }
+  }
+  return true;
+};
+
 const runTestAndPost = async (timeStamp, browser, domain, numScreenshots = 1) => {
-  const results = await domainTest(browser, domain, numScreenshots);
+  let results = await domainTest(browser, domain, 1);
+  results["analysis"] = analyzeResult(results);
+  console.log(results);
+  if (allFailed(results.analysis)) {
+    // Try again but with more screenshots
+    results = await domainTest(browser, domain, 5);
+    results["analysis"] = analyzeResult(results);
+    console.log(results);
+  }
   const response = await putJSON(`raw/${timeStamp}/${domain}`, results);
   return { results, response };
 };
