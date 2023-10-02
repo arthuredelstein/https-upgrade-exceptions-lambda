@@ -1,6 +1,7 @@
 import { SQSClient, SendMessageCommand, SendMessageBatchCommand } from '@aws-sdk/client-sqs';
 import { S3 } from '@aws-sdk/client-s3';
 import moize from 'moize';
+import fsPromise from 'node:fs/promises';
 
 const httpsUpgradeExceptionsBucket = 'https-upgrade-exceptions';
 
@@ -52,15 +53,15 @@ export const putJSON = (path, jsonObject) =>
 
 
 export const putText = (path, text) => 
-s3_client.putObject({
-  Bucket: httpsUpgradeExceptionsBucket,
-  Key: path,
-  Body: text,
-  ContentType: 'text/plain'
-});
+  s3_client.putObject({
+    Bucket: httpsUpgradeExceptionsBucket,
+    Key: path,
+    Body: text,
+    ContentType: 'text/plain'
+  });
 
 export const listObjects = (path, ContinuationToken) =>
-  client.listObjectsV2({
+  s3_client.listObjectsV2({
     Bucket: httpsUpgradeExceptionsBucket,
     Prefix: path,
     ContinuationToken

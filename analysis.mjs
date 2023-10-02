@@ -1,9 +1,11 @@
 import pMap from 'p-map';
+
+import pFilter from 'p-filter';
 import fsPromise from 'node:fs/promises';
 import path from 'node:path';
 import _ from 'lodash';
 import { stringify } from 'csv-stringify/sync';
-import { getJSON, getAllNames } from './util.mjs';
+import { getJSON, getAllNames, putText } from './util.mjs';
 
 const useRemote = true;
 
@@ -300,4 +302,37 @@ const writeAnalysisFile = async (filename, results) => {
 const analyzeBothFailures = (obj) => {
 
   return { secureStatus, insecureStatus };
+}
+
+const shouldBeOnList = async (name) => {
+  const data = await getJSON(name);
+  for (const [name, passed] of Object.entries(data.analysis)) {
+    if (passed) {
+      return false;
+    }
+  }
+  return true;
+}
+
+const getExceptionsList = async (names) => {
+  let i = 0;
+  return await pFilter(names, async (name) => {
+    ++i;
+    if (i % 1000 === 0) {
+      console.log(i);
+    }
+    try {
+      return await shouldBeOnList(name);
+    } catch (e) {
+      console.log(name, ":", e);
+      return false;
+    }
+  }, { concurrency: 50});
+}
+
+const writeExceptionsList = async (list) => {
+  const domains = list.map(x => x.split("/")[2]);
+  const fileContents =  domains.join("\n");
+  await putText("current_list.txt", fileContents);
+  return fileContents;
 }
