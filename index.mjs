@@ -6,6 +6,7 @@ import crx from 'crx-util';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import Jimp from 'jimp';
 import { analyzeResult } from './analysis.mjs'
+import { shouldBeOnList } from './produce.mjs';
 
 Error.stackTraceLimit = Infinity;
 
@@ -138,6 +139,15 @@ const allFailed = (x) => {
   return true;
 };
 
+const checkIfUpgradable = (data) => {
+  for (const [/* name */, passed] of Object.entries(data.analysis)) {
+    if (passed) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const runTestAndPost = async (timeStamp, browser, domain, numScreenshots = 1) => {
   let results = await domainTest(browser, domain, 1);
   results["analysis"] = analyzeResult(results);
@@ -149,7 +159,13 @@ const runTestAndPost = async (timeStamp, browser, domain, numScreenshots = 1) =>
     console.log(results);
   }
   const response = await putJSON(`raw/${timeStamp}/${domain}`, results);
-  return { results, response };
+
+  let response2;
+  if (!checkIfUpgradable(results)) {
+    response2 = await putJSON(`exceptions/${timeStamp}/${domain}`, results);
+  }
+
+  return { results, response, response2 };
 };
 
 let gBrowser;

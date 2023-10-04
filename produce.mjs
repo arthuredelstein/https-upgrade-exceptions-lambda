@@ -1,7 +1,12 @@
 import pFilter from 'p-filter';
-import { getJSON, getAllNames, putText } from './util.mjs';
+import { getJSON, getText, getAllNames, putText } from './util.mjs';
 
-const shouldBeOnList = async (name) => {
+const getDomainListSnapshot = async (path) => {
+  const text = await getText(`domainListSnapshots/${path}`);
+  return text.split("\n");
+};
+
+export const shouldBeOnList = async (name) => {
   const data = await getJSON(name);
   for (const [/* name */, passed] of Object.entries(data.analysis)) {
     if (passed) {
@@ -24,7 +29,7 @@ const getExceptionsList = async (names) => {
       console.log(name, ':', e);
       return false;
     }
-  }, { concurrency: 50 });
+  }, { concurrency: 500 });
 };
 
 const writeExceptionsList = async (list) => {
@@ -34,8 +39,18 @@ const writeExceptionsList = async (list) => {
   return fileContents;
 };
 
-export const produceExceptionsList = async () => {
-  const names = await getAllNames();
+export const produceExceptionsList = async (path) => {
+  const names = await getAllNames('raw/' + path);
   const list = await getExceptionsList(names);
   await writeExceptionsList(list);
+};
+
+export const handler = async (event, context) => {
+  try {
+    await produceExceptionsList(event.name);
+    return null;
+  } catch (e) {
+    console.log(e);
+    return null;
+  }
 };

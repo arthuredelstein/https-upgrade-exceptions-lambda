@@ -60,6 +60,14 @@ export const putText = (path, text) =>
     ContentType: 'text/plain'
   });
 
+export const getText = async (path) => {
+  const result = await s3_client.getObject({
+    Bucket: httpsUpgradeExceptionsBucket,
+    Key: path
+  });
+  return result.Body.transformToString();
+}
+
 export const listObjects = (path, ContinuationToken) =>
   s3_client.listObjectsV2({
     Bucket: httpsUpgradeExceptionsBucket,
