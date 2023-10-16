@@ -39,10 +39,22 @@ const writeExceptionsList = async (list) => {
   return fileContents;
 };
 
+const writeCombinedExceptionsList = async () => {
+  const manualListResponse = await fetch('https://raw.githubusercontent.com/brave/adblock-lists/master/brave-lists/https-upgrade-exceptions-list.txt');
+  const manualListText = await manualListResponse.text();
+  const manualList = manualListText.split('\n');
+  const automatedListText = await getText('current_list.txt');
+  const automatedList = automatedListText.split('\n');
+  const combinedList = [...manualList, ...automatedList];
+  const combinedListText = combinedList.filter(x => x.trim().length > 0).join('\n');
+  await putText('https-upgrade-exceptions-list.txt', combinedListText);
+}
+
 export const produceExceptionsList = async (path) => {
   const names = await getAllNames('raw/' + path);
   const list = await getExceptionsList(names);
   await writeExceptionsList(list);
+  await writeCombinedExceptionsList();
 };
 
 export const handler = async (event, context) => {
